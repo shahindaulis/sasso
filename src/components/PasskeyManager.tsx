@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, RegisteredPasskey } from '../types';
+import { ConfirmModal } from './ConfirmModal';
 import {
   KeyRound,
   Fingerprint,
@@ -38,6 +39,9 @@ export const PasskeyManager: React.FC<PasskeyManagerProps> = ({
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Confirm Modal state for deleting passkeys
+  const [pendingDeletePasskey, setPendingDeletePasskey] = useState<{ id: string; name: string } | null>(null);
 
   const fetchPasskeys = async () => {
     setLoading(true);
@@ -147,10 +151,13 @@ export const PasskeyManager: React.FC<PasskeyManagerProps> = ({
     }
   };
 
-  const handleDeletePasskey = async (credentialID: string, deviceName: string) => {
-    if (!window.confirm(`Are you sure you want to delete passkey "${deviceName}"?`)) {
-      return;
-    }
+  const promptDeletePasskey = (credentialID: string, deviceName: string) => {
+    setPendingDeletePasskey({ id: credentialID, name: deviceName });
+  };
+
+  const confirmDeletePasskey = async () => {
+    if (!pendingDeletePasskey) return;
+    const { id: credentialID, name: deviceName } = pendingDeletePasskey;
 
     setDeletingId(credentialID);
     setErrorMsg(null);
@@ -176,6 +183,7 @@ export const PasskeyManager: React.FC<PasskeyManagerProps> = ({
       setErrorMsg(err.message || 'Failed to delete passkey');
     } finally {
       setDeletingId(null);
+      setPendingDeletePasskey(null);
     }
   };
 
@@ -360,7 +368,7 @@ export const PasskeyManager: React.FC<PasskeyManagerProps> = ({
               {/* Revoke / Delete Button - Cannot delete if only 1 passkey exists */}
               {passkeys.length > 1 && (
                 <button
-                  onClick={() => handleDeletePasskey(pk.credentialID, pk.deviceName)}
+                  onClick={() => promptDeletePasskey(pk.credentialID, pk.deviceName)}
                   disabled={deletingId === pk.credentialID}
                   className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50"
                   title="Delete/Revoke Passkey"
@@ -376,6 +384,19 @@ export const PasskeyManager: React.FC<PasskeyManagerProps> = ({
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!pendingDeletePasskey}
+        title="Delete Passkey"
+        message={`Are you sure you want to permanently delete passkey "${pendingDeletePasskey?.name}"? You will no longer be able to use this key to sign in.`}
+        confirmLabel="Delete Passkey"
+        cancelLabel="Keep Passkey"
+        variant="danger"
+        enableBiometricOption={passkeys.length > 0}
+        isLoading={!!deletingId}
+        onConfirm={confirmDeletePasskey}
+        onCancel={() => setPendingDeletePasskey(null)}
+      />
     </div>
   );
 };

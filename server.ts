@@ -105,7 +105,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// API logging middleware to trace OAuth/OIDC traffic
+// API logging middleware to trace OAuth/OIDC traffic and security events
 const ssoTrafficLogs: any[] = [];
 const logTraffic = (protocol: string, type: string, source: string, destination: string, message: string, details?: any) => {
   const log = {
@@ -119,10 +119,106 @@ const logTraffic = (protocol: string, type: string, source: string, destination:
     details
   };
   ssoTrafficLogs.push(log);
-  if (ssoTrafficLogs.length > 100) {
-    ssoTrafficLogs.shift(); // Keep last 100 logs
+  if (ssoTrafficLogs.length > 200) {
+    ssoTrafficLogs.shift(); // Keep last 200 logs
   }
 };
+
+// ------------------ INPUT SANITIZATION & VALIDATION ------------------
+
+function sanitizeString(input: any): string {
+  if (typeof input !== 'string') return '';
+  // Strip control characters, script/HTML tags, null bytes, and trim
+  return input
+    .replace(/\0/g, '')
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .trim();
+}
+
+function sanitizeObject(obj: any): any {
+  if (obj === null || typeof obj !== 'object') {
+    if (typeof obj === 'string') return sanitizeString(obj);
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeObject);
+  }
+  const sanitized: Record<string, any> = {};
+  for (const key of Object.keys(obj)) {
+    // Keep raw webauthn passkey challenge & response objects intact, sanitize text fields
+    if (key === 'registrationResponse' || key === 'authenticationResponse' || key === 'response') {
+      sanitized[key] = obj[key];
+    } else {
+      sanitized[key] = sanitizeObject(obj[key]);
+    }
+  }
+  return sanitized;
+}
+
+const sanitizeInputsMiddleware: express.RequestHandler = (req, res, next) => {
+  if (req.body && typeof req.body === 'object') {
+    req.body = sanitizeObject(req.body);
+  }
+  if (req.query && typeof req.query === 'object') {
+    req.query = sanitizeObject(req.query);
+  }
+  if (req.params && typeof req.params === 'object') {
+    req.params = sanitizeObject(req.params);
+  }
+  next();
+};
+
+app.use('/api', sanitizeInputsMiddleware);
+
+// ------------------ RATE LIMITING MIDDLEWARE ------------------
+
+interface RateLimitRecord {
+  count: number;
+  resetTime: number;
+}
+
+const rateLimitStore = new Map<string, RateLimitRecord>();
+
+function createRateLimiter(options: { windowMs: number; max: number; keyPrefix: string; message: string }) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.socket.remoteAddress || '127.0.0.1';
+    const key = `${options.keyPrefix}:${clientIp}`;
+    const now = Date.now();
+
+    let record = rateLimitStore.get(key);
+    if (!record || now > record.resetTime) {
+      record = { count: 1, resetTime: now + options.windowMs };
+      rateLimitStore.set(key, record);
+    } else {
+      record.count += 1;
+    }
+
+    if (record.count > options.max) {
+      logTraffic(
+        'Rate Limiter',
+        'rate_limit',
+        clientIp,
+        req.path,
+        `Rate limit exceeded: ${record.count}/${options.max} requests`
+      );
+      return res.status(429).json({
+        error: options.message,
+        retryAfterSeconds: Math.ceil((record.resetTime - now) / 1000)
+      });
+    }
+
+    next();
+  };
+}
+
+// Strict limiter for authentication & security operations (30 attempts per 15 minutes)
+const authRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  keyPrefix: 'auth_rl',
+  message: 'Too many authentication or sensitive attempts from this IP. Please try again after 15 minutes.'
+});
 
 const getRpIDAndOrigin = (req: any) => {
   const hostHeader = req.get('x-forwarded-host') || req.get('host') || 'localhost';
@@ -147,9 +243,13 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Fetch active traffic logs for protocol inspector
+// Fetch active traffic logs for protocol inspector & security audit logger
 app.get('/api/sso/logs', (req, res) => {
   res.json(ssoTrafficLogs);
+});
+
+app.get('/api/traffic-logs', (req, res) => {
+  res.json({ logs: ssoTrafficLogs });
 });
 
 // Clear traffic logs

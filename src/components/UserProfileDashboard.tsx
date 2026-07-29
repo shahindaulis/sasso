@@ -27,6 +27,7 @@ import { EmailVerificationView } from './EmailVerificationView';
 import { PasskeyManager } from './PasskeyManager';
 import { ActiveSessionsView } from './ActiveSessionsView';
 import { RecoveryCodeManager } from './RecoveryCodeManager';
+import { ConfirmModal } from './ConfirmModal';
 import {
   Fingerprint,
   QrCode,
@@ -74,6 +75,10 @@ export const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Confirmation Modals State
+  const [pendingRevokeApp, setPendingRevokeApp] = useState<{ id: string; name: string } | null>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Sidebar Drawer state
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -143,7 +148,14 @@ export const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({
     fetchAuthorizedApps();
   }, [centralToken]);
 
-  const handleRevokeApp = async (appId: string, appName: string) => {
+  const promptRevokeApp = (appId: string, appName: string) => {
+    setPendingRevokeApp({ id: appId, name: appName });
+  };
+
+  const confirmRevokeApp = async () => {
+    if (!pendingRevokeApp) return;
+    const { id: appId, name: appName } = pendingRevokeApp;
+
     setRevokingId(appId);
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -169,6 +181,7 @@ export const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({
       setErrorMsg(err.message || 'Revoke failed');
     } finally {
       setRevokingId(null);
+      setPendingRevokeApp(null);
     }
   };
 
@@ -356,7 +369,7 @@ export const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({
                     <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                       <span className="text-[10px] text-gray-400 font-mono truncate max-w-[180px]">ID: {app.id}</span>
                       <button
-                        onClick={() => handleRevokeApp(app.id, app.name)}
+                        onClick={() => promptRevokeApp(app.id, app.name)}
                         disabled={revokingId === app.id}
                         className="px-3.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-extrabold transition-colors flex items-center gap-1.5 border border-red-100 disabled:opacity-50 shrink-0 w-full sm:w-auto justify-center cursor-pointer"
                       >
@@ -561,7 +574,7 @@ export const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({
               <button
                 onClick={() => {
                   setIsSidebarOpen(false);
-                  onLogout();
+                  setShowLogoutConfirm(true);
                 }}
                 className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
               >
@@ -572,6 +585,34 @@ export const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* Confirm Revoke App Modal */}
+      <ConfirmModal
+        isOpen={!!pendingRevokeApp}
+        title="Revoke Connected Application"
+        message={`Are you sure you want to revoke access for "${pendingRevokeApp?.name}"? It will no longer be able to authenticate with your sasso account.`}
+        confirmLabel="Revoke Access"
+        cancelLabel="Keep Access"
+        variant="danger"
+        isLoading={!!revokingId}
+        onConfirm={confirmRevokeApp}
+        onCancel={() => setPendingRevokeApp(null)}
+      />
+
+      {/* Confirm Logout Modal */}
+      <ConfirmModal
+        isOpen={showLogoutConfirm}
+        title="Sign Out Confirmation"
+        message="Are you sure you want to sign out of your sasso central SSO session?"
+        confirmLabel="Sign Out"
+        cancelLabel="Cancel"
+        variant="warning"
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          onLogout();
+        }}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </div>
   );
 };

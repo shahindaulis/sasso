@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ClientApp } from '../types';
+import { ConfirmModal } from './ConfirmModal';
+import { SecurityAuditLogger } from './SecurityAuditLogger';
 import { 
   Shield, 
   Globe, 
@@ -32,7 +34,7 @@ interface DeveloperConsoleProps {
 
 export function DeveloperConsole({ appsList, onRefreshApps, currentUser, centralToken }: DeveloperConsoleProps) {
   const navigate = useNavigate();
-  const [activeSubTab, setActiveSubTab] = useState<'list' | 'register' | 'docs' | 'simulator'>('list');
+  const [activeSubTab, setActiveSubTab] = useState<'list' | 'register' | 'docs' | 'simulator' | 'audit-logs'>('list');
   
   // Registration Form State
   const [appName, setAppName] = useState('');
@@ -44,6 +46,10 @@ export function DeveloperConsole({ appsList, onRefreshApps, currentUser, central
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [registeredCreds, setRegisteredCreds] = useState<{ clientId: string; clientSecret: string } | null>(null);
+
+  // App deletion modal state
+  const [pendingDeleteApp, setPendingDeleteApp] = useState<{ id: string; name: string } | null>(null);
+  const [deletingApp, setDeletingApp] = useState(false);
 
   // UI States
   const [showSecretMap, setShowSecretMap] = useState<Record<string, boolean>>({});
@@ -123,11 +129,16 @@ export function DeveloperConsole({ appsList, onRefreshApps, currentUser, central
     }
   };
 
-  // Delete App from real API
-  const handleDeleteApp = async (appId: string) => {
-    if (!window.confirm('Are you sure you want to permanently delete this client application? Dynamic apps will be un-registered.')) {
-      return;
-    }
+  // Delete App prompt and confirm
+  const promptDeleteApp = (appId: string, appName: string) => {
+    setPendingDeleteApp({ id: appId, name: appName });
+  };
+
+  const confirmDeleteApp = async () => {
+    if (!pendingDeleteApp) return;
+    const appId = pendingDeleteApp.id;
+    setDeletingApp(true);
+    setErrorMsg('');
 
     try {
       const res = await fetch('/api/sso/apps/delete', {
@@ -150,7 +161,10 @@ export function DeveloperConsole({ appsList, onRefreshApps, currentUser, central
         resetSimulator();
       }
     } catch (err: any) {
-      alert(err.message);
+      setErrorMsg(err.message || 'Failed to delete application.');
+    } finally {
+      setDeletingApp(false);
+      setPendingDeleteApp(null);
     }
   };
 
@@ -321,11 +335,24 @@ export function DeveloperConsole({ appsList, onRefreshApps, currentUser, central
             >
               OIDC Sandbox Simulator
             </button>
+            <button
+              onClick={() => setActiveSubTab('audit-logs')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                activeSubTab === 'audit-logs' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              Security & Audit Logs
+            </button>
           </div>
         </div>
       </div>
 
       <div className="p-6 md:p-8">
+        
+        {/* TAB 5: SECURITY AUDIT LOGS */}
+        {activeSubTab === 'audit-logs' && (
+          <SecurityAuditLogger centralToken={centralToken} />
+        )}
         
         {/* TAB 1: REGISTERED CLIENT APPLICATIONS LIST */}
         {activeSubTab === 'list' && (
@@ -384,7 +411,7 @@ export function DeveloperConsole({ appsList, onRefreshApps, currentUser, central
                       {/* App Management Options */}
                       {!['sales', 'hr'].includes(app.id) && (
                         <button
-                          onClick={() => handleDeleteApp(app.id)}
+                          onClick={() => promptDeleteApp(app.id, app.name)}
                           className="p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-lg transition-colors"
                           title="Delete Application"
                         >
@@ -991,6 +1018,18 @@ app.post('/api/refresh-session', async (req, res) => {
         )}
 
       </div>
+
+      <ConfirmModal
+        isOpen={!!pendingDeleteApp}
+        title="Delete Client Application"
+        message={`Are you sure you want to permanently delete application "${pendingDeleteApp?.name}"? Connected dynamic apps will be un-registered immediately.`}
+        confirmLabel="Delete Application"
+        cancelLabel="Keep Application"
+        variant="danger"
+        isLoading={deletingApp}
+        onConfirm={confirmDeleteApp}
+        onCancel={() => setPendingDeleteApp(null)}
+      />
     </div>
   );
 }

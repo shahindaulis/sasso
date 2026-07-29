@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, UserActiveSession } from '../types';
+import { ConfirmModal } from './ConfirmModal';
 import {
   Laptop,
   Smartphone,
@@ -33,6 +34,9 @@ export const ActiveSessionsView: React.FC<ActiveSessionsViewProps> = ({
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Confirm Modal state
+  const [pendingRevokeSession, setPendingRevokeSession] = useState<{ id: string; name: string } | null>(null);
 
   // Client-side current browser info
   const clientUa = typeof navigator !== 'undefined' ? navigator.userAgent : '';
@@ -90,10 +94,13 @@ export const ActiveSessionsView: React.FC<ActiveSessionsViewProps> = ({
     fetchSessions();
   }, [centralToken]);
 
-  const handleRevokeSession = async (sessionId: string, deviceName: string) => {
-    if (!window.confirm(`Revoke session for "${deviceName}"? This device will be logged out.`)) {
-      return;
-    }
+  const promptRevokeSession = (sessionId: string, deviceName: string) => {
+    setPendingRevokeSession({ id: sessionId, name: deviceName });
+  };
+
+  const confirmRevokeSession = async () => {
+    if (!pendingRevokeSession) return;
+    const { id: sessionId, name: deviceName } = pendingRevokeSession;
 
     setRevokingId(sessionId);
     setErrorMsg(null);
@@ -120,6 +127,7 @@ export const ActiveSessionsView: React.FC<ActiveSessionsViewProps> = ({
       setErrorMsg(err.message || 'Failed to revoke session');
     } finally {
       setRevokingId(null);
+      setPendingRevokeSession(null);
     }
   };
 
@@ -345,7 +353,7 @@ export const ActiveSessionsView: React.FC<ActiveSessionsViewProps> = ({
                       </div>
 
                       <button
-                        onClick={() => handleRevokeSession(s.sessionId, s.deviceName)}
+                        onClick={() => promptRevokeSession(s.sessionId, s.deviceName)}
                         disabled={revokingId === s.sessionId}
                         className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 self-end sm:self-auto min-h-[36px]"
                       >
@@ -364,6 +372,18 @@ export const ActiveSessionsView: React.FC<ActiveSessionsViewProps> = ({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!pendingRevokeSession}
+        title="Revoke Session"
+        message={`Are you sure you want to revoke session for "${pendingRevokeSession?.name}"? This device will be logged out immediately.`}
+        confirmLabel="Revoke Session"
+        cancelLabel="Keep Session"
+        variant="danger"
+        isLoading={!!revokingId}
+        onConfirm={confirmRevokeSession}
+        onCancel={() => setPendingRevokeSession(null)}
+      />
     </div>
   );
 };
