@@ -269,7 +269,7 @@ export const QrApprovalModal: React.FC<QrApprovalModalProps> = ({
             A laptop/second device is requesting to sign in to your account:
           </p>
           <p className="text-xs font-extrabold text-indigo-700 bg-indigo-50 py-1 px-3 rounded-lg inline-block mt-1">
-            {currentUser.email}
+            {currentUser.username || currentUser.email}
           </p>
         </div>
 

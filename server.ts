@@ -632,7 +632,9 @@ app.post('/api/sso/verify-central', async (req, res) => {
       return res.status(400).json({ error: 'Invalid token type' });
     }
 
-    const user = await getUserProfile(decoded.email);
+    const user = (decoded.username ? await getUserProfile(decoded.username) : null) ||
+                 (decoded.email ? await getUserProfile(decoded.email) : null) ||
+                 (decoded.uid ? await getUserById(decoded.uid) : null);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -952,9 +954,11 @@ app.post('/api/auth/qr/approve', async (req, res) => {
     return res.status(401).json({ error: 'You must be signed in on this device to approve QR login.' });
   }
 
-  const user = await getUserProfile(decoded.email);
+  const user = (decoded.username ? await getUserProfile(decoded.username) : null) ||
+               (decoded.email ? await getUserProfile(decoded.email) : null) ||
+               (decoded.uid ? await getUserById(decoded.uid) : null);
   if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+    return res.status(404).json({ error: 'User account not found' });
   }
 
   // Issue token for the new laptop session
@@ -969,14 +973,14 @@ app.post('/api/auth/qr/approve', async (req, res) => {
   const newSessionId = 'sess_' + crypto.randomBytes(16).toString('hex');
   await createActiveSession(
     newSessionId,
-    user.email,
+    user.username || user.email,
     'Laptop (QR Login)',
     req.headers['user-agent'] || 'Remote Device',
     (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.socket.remoteAddress || '127.0.0.1',
     'qr_code'
   );
 
-  logTraffic('Central Auth', 'success', 'SSO Server', 'Mobile Client', `Approved QR Login ${qrSessionId} for ${user.email}`);
+  logTraffic('Central Auth', 'success', 'SSO Server', 'Mobile Client', `Approved QR Login ${qrSessionId} for ${user.username || user.email}`);
 
   res.json({
     success: true,
