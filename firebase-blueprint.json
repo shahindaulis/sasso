@@ -1,0 +1,127 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with login and profile details",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Unique user ID"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User email address"
+        },
+        "passwordHash": {
+          "type": "string",
+          "description": "SHA-256 hashed password"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "User's first name"
+        },
+        "lastName": {
+          "type": "string",
+          "description": "User's last name"
+        },
+        "avatarUrl": {
+          "type": "string",
+          "description": "URL of user's avatar"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of registration"
+        }
+      },
+      "required": ["uid", "email", "passwordHash", "firstName", "lastName", "createdAt"]
+    },
+    "AuthCode": {
+      "title": "AuthCode",
+      "description": "Temporary authorization code for OAuth/OIDC flow",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "The unique authorization code"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Associated user ID"
+        },
+        "clientId": {
+          "type": "string",
+          "description": "The requesting client ID"
+        },
+        "redirectUri": {
+          "type": "string",
+          "description": "The matched redirect URI"
+        },
+        "expiresAt": {
+          "type": "number",
+          "description": "Epoch timestamp of expiry"
+        },
+        "used": {
+          "type": "boolean",
+          "description": "Whether this code has already been exchanged"
+        }
+      },
+      "required": ["code", "userId", "clientId", "redirectUri", "expiresAt", "used"]
+    },
+    "ClientApp": {
+      "title": "ClientApp",
+      "description": "OIDC/OAuth client application registration details",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique client application ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Application display name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description of the app"
+        },
+        "logo": {
+          "type": "string",
+          "description": "Icon identifier"
+        },
+        "url": {
+          "type": "string",
+          "description": "Home URL of the client app"
+        },
+        "redirectUri": {
+          "type": "string",
+          "description": "Valid redirect URI for OIDC flow"
+        },
+        "clientSecret": {
+          "type": "string",
+          "description": "Client secret key"
+        },
+        "accentColor": {
+          "type": "string",
+          "description": "Theme color code (hex)"
+        }
+      },
+      "required": ["id", "name", "url", "redirectUri", "clientSecret"]
+    }
+  },
+  "firestore": {
+    "/users/{email}": {
+      "schema": "UserProfile",
+      "description": "Stores user profiles and credentials keyed by email"
+    },
+    "/auth_codes/{code}": {
+      "schema": "AuthCode",
+      "description": "Stores short-lived OAuth authorization codes"
+    },
+    "/client_apps/{id}": {
+      "schema": "ClientApp",
+      "description": "Stores OIDC/OAuth dynamically registered clients"
+    }
+  }
+}

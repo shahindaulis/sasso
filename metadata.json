@@ -1,0 +1,6 @@
+{
+  "name": "sasso",
+  "description": "A high-fidelity Single Sign-On (SSO) web application using Node.js, Express, JWT, and Firebase Firestore.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
