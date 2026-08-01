@@ -1334,6 +1334,7 @@ export async function approveQrSession(qrSessionId: string, user: UserProfile, t
     try {
       await updateDoc(doc(db, 'sasso_qr_sessions', qrSessionId), {
         status: 'approved',
+        user: user,
         userEmail: user.email,
         token
       });

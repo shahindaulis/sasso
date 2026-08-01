@@ -1031,12 +1031,18 @@ app.get('/api/auth/qr/status', async (req, res) => {
     return res.status(404).json({ status: 'not_found' });
   }
 
-  if (session.status === 'approved' && session.user && session.token) {
-    return res.json({
-      status: 'approved',
-      user: session.user,
-      token: session.token
-    });
+  if (session.status === 'approved' && session.token) {
+    let userObj = session.user;
+    if (!userObj && session.userEmail) {
+      userObj = await getUserProfile(session.userEmail);
+    }
+    if (userObj) {
+      return res.json({
+        status: 'approved',
+        user: userObj,
+        token: session.token
+      });
+    }
   }
 
   res.json({ status: session.status });
