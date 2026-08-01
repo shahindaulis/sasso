@@ -67,7 +67,7 @@ export const QrCodeLoginModal: React.FC<QrCodeLoginModalProps> = ({
     }
   }, [isOpen]);
 
-  // Poll for QR status every 2s
+  // Poll for QR status every 1s for instant response
   useEffect(() => {
     if (!isOpen || !qrSessionId || status === 'approved' || status === 'expired') {
       return;
@@ -82,12 +82,20 @@ export const QrCodeLoginModal: React.FC<QrCodeLoginModalProps> = ({
           if (data.status === 'approved' && data.user && data.token) {
             setStatus('approved');
             clearInterval(interval);
-            setTimeout(() => {
-              if (onLoginSuccess) {
-                onLoginSuccess(data.user, data.token);
-              }
-              onClose();
-            }, 1200);
+            
+            // Save tokens immediately to storage
+            localStorage.setItem('sasso_access_token', data.token);
+            localStorage.setItem('sasso_central_token', data.token);
+            localStorage.setItem('sasso_user_profile', JSON.stringify(data.user));
+
+            if (onLoginSuccess) {
+              onLoginSuccess(data.user, data.token);
+            }
+            onClose();
+            // Force navigate to profile if not redirected automatically
+            if (window.location.pathname !== '/profile') {
+              window.location.href = '/profile';
+            }
           } else if (data.status === 'expired') {
             setStatus('expired');
             clearInterval(interval);
@@ -96,7 +104,7 @@ export const QrCodeLoginModal: React.FC<QrCodeLoginModalProps> = ({
       } catch (err) {
         console.error('QR status check error:', err);
       }
-    }, 2000);
+    }, 1000);
 
     return () => clearInterval(interval);
   }, [isOpen, qrSessionId, status]);
@@ -312,31 +320,11 @@ export const QrApprovalModal: React.FC<QrApprovalModalProps> = ({
           </p>
         </div>
 
-        {/* Security & Proximity Status Cards */}
+        {/* Security Check Card */}
         <div className="space-y-2 text-left bg-gray-50 p-3.5 rounded-2xl border border-gray-200">
           <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center justify-between">
-            <span>Security & Proximity Checks</span>
+            <span>Security Checks</span>
             <Lock className="w-3 h-3 text-gray-400" />
-          </div>
-
-          {/* Bluetooth Check */}
-          <div className="p-2.5 bg-white rounded-xl border border-gray-200 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {btStatus === 'scanning' ? (
-                <BluetoothSearching className="w-4 h-4 text-indigo-600 animate-spin" />
-              ) : (
-                <BluetoothConnected className="w-4 h-4 text-emerald-600" />
-              )}
-              <div>
-                <p className="text-xs font-bold text-gray-900">Bluetooth BLE Signal</p>
-                <p className="text-[10px] text-gray-500">
-                  {btStatus === 'scanning' ? 'Verifying device distance...' : 'Nearby Device Verified (< 1m)'}
-                </p>
-              </div>
-            </div>
-            <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-              {btStatus === 'scanning' ? 'SCANNING' : 'PASSED'}
-            </span>
           </div>
 
           {/* Biometric Check */}
@@ -346,7 +334,7 @@ export const QrApprovalModal: React.FC<QrApprovalModalProps> = ({
               <div>
                 <p className="text-xs font-bold text-gray-900">Biometric Verification</p>
                 <p className="text-[10px] text-gray-500">
-                  {biometricVerified ? 'TouchID / FaceID Passed' : 'Optional Extra Security'}
+                  {biometricVerified ? 'TouchID / FaceID Passed' : 'Verify Identity via Passkey'}
                 </p>
               </div>
             </div>
@@ -383,7 +371,7 @@ export const QrApprovalModal: React.FC<QrApprovalModalProps> = ({
           <div className="space-y-2 pt-1">
             <button
               onClick={handleApprove}
-              disabled={approving || btStatus === 'scanning'}
+              disabled={approving}
               className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-extrabold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
             >
               {approving ? (

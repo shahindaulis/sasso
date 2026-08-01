@@ -86,9 +86,9 @@ export default function App() {
     const qrSessParam = params.get('qrSession');
     if (qrSessParam) {
       setPendingQrSession(qrSessParam);
-      sessionStorage.setItem('pending_qr_session', qrSessParam);
+      localStorage.setItem('pending_qr_session', qrSessParam);
     } else {
-      const savedQr = sessionStorage.getItem('pending_qr_session');
+      const savedQr = localStorage.getItem('pending_qr_session');
       if (savedQr) {
         setPendingQrSession(savedQr);
       }
@@ -246,10 +246,12 @@ export default function App() {
           centralToken={centralToken}
           currentUser={currentUser}
           onApproved={() => {
+            localStorage.removeItem('pending_qr_session');
             sessionStorage.removeItem('pending_qr_session');
             setPendingQrSession(null);
           }}
           onCancel={() => {
+            localStorage.removeItem('pending_qr_session');
             sessionStorage.removeItem('pending_qr_session');
             setPendingQrSession(null);
           }}

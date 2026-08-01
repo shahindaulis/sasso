@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserProfile } from '../types';
-import { Shield, Key, Mail, Fingerprint, ArrowRight, ArrowLeft, UserPlus, AlertCircle, KeyRound, QrCode } from 'lucide-react';
+import { Shield, Key, Mail, Fingerprint, ArrowRight, ArrowLeft, UserPlus, AlertCircle, KeyRound } from 'lucide-react';
 import { startAuthentication, WebAuthnAbortService } from '@simplewebauthn/browser';
 import { AccountRecoveryModal } from './AccountRecoveryModal';
-import { QrCodeLoginModal } from './QrCodeLoginModal';
 
 const safeStartAuthentication = async (options: Parameters<typeof startAuthentication>[0]) => {
   // 1. Pehle se chal rahe kisi bhi passkey prompt ko abort cancel command bheja
@@ -61,7 +60,6 @@ export const SignIn: React.FC<SignInProps> = ({ onLoginSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
-  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const webauthnActiveRef = useRef(false);
   const navigate = useNavigate();
 
@@ -156,7 +154,7 @@ export const SignIn: React.FC<SignInProps> = ({ onLoginSuccess }) => {
           </div>
           <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight break-words">Sign In with sasso</h1>
           <p className="text-xs text-gray-500 max-w-xs mx-auto">
-            Log in securely using passwordless Passkeys (Fingerprint / Face ID / Security Key)
+            Log in securely using Native Passkeys (FIDO2 / WebAuthn Cross-Device QR)
           </p>
         </div>
 
@@ -167,37 +165,19 @@ export const SignIn: React.FC<SignInProps> = ({ onLoginSuccess }) => {
           </div>
         )}
 
-        {/* 1-Click Usernameless Passkey Login Button */}
+        {/* Native WebAuthn FIDO2 Passkey Login Button */}
         <div className="space-y-4">
           <button
             onClick={handlePasskeyLogin}
             disabled={loading}
-            className="w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-2xl text-xs sm:text-sm font-extrabold shadow-md shadow-indigo-100 transition-all flex items-center justify-center gap-2.5 disabled:opacity-60 disabled:cursor-not-allowed min-h-[48px] text-center"
+            className="w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-2xl text-xs sm:text-sm font-extrabold shadow-md shadow-indigo-100 transition-all flex items-center justify-center gap-2.5 disabled:opacity-60 disabled:cursor-not-allowed min-h-[48px] text-center cursor-pointer"
           >
             {loading ? (
               <span className="inline-block animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full shrink-0" />
             ) : (
               <Fingerprint className="w-4.5 h-4.5 shrink-0" />
             )}
-            <span>{loading ? 'Verifying Passkey...' : 'Login with Passkey'}</span>
-          </button>
-
-          <div className="bg-slate-50 border border-gray-200 rounded-2xl p-3 text-[11px] text-gray-500 flex items-start justify-between gap-2">
-            <div className="flex items-start gap-2">
-              <Fingerprint className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-              <span>
-                <strong>1-Click Usernameless Sign In:</strong> No email or password needed! Click above to authenticate.
-              </span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setIsQrModalOpen(true)}
-            className="w-full py-2.5 px-3 text-center text-xs font-bold text-indigo-700 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-          >
-            <QrCode className="w-4 h-4 text-indigo-600" />
-            <span>Sign In with QR Code (No Passkey on Laptop)</span>
+            <span>{loading ? 'Verifying Passkey...' : 'Sign In with Passkey'}</span>
           </button>
 
           <button
@@ -209,15 +189,6 @@ export const SignIn: React.FC<SignInProps> = ({ onLoginSuccess }) => {
             <span>Lost Passkey? Recover Account via Recovery Code</span>
           </button>
         </div>
-
-        <QrCodeLoginModal
-          isOpen={isQrModalOpen}
-          onClose={() => setIsQrModalOpen(false)}
-          onLoginSuccess={(user, token) => {
-            onLoginSuccess(token, user);
-            navigate('/profile');
-          }}
-        />
 
         <AccountRecoveryModal
           isOpen={isRecoveryOpen}
